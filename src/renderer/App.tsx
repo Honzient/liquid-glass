@@ -1,4 +1,5 @@
 import { Canvas } from "@react-three/fiber";
+import Tank from "./components/Tank";
 
 export default function App() {
   return (
@@ -6,7 +7,7 @@ export default function App() {
       style={{ width: "100%", height: "100%" }}
       gl={{ alpha: true, premultipliedAlpha: true }}
     >
-      <ambientLight intensity={0.5} />
+      <Tank />
     </Canvas>
   );
 }
