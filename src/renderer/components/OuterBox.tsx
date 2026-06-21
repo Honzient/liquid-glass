@@ -11,12 +11,16 @@ export default function OuterBox({ width, height, depth }: OuterBoxProps) {
     <RoundedBox args={[width, height, depth]} radius={0.05} bevelSegments={4}>
       <meshPhysicalMaterial
         transparent={true}
-        opacity={0.15}
-        roughness={0.05}
-        metalness={0.2}
+        transmission={0.95}
+        opacity={1}
+        ior={1.52}
+        thickness={0.5}
+        roughness={0.02}
+        metalness={0.05}
         clearcoat={1}
-        clearcoatRoughness={0.1}
-        envMapIntensity={2.5}
+        clearcoatRoughness={0.05}
+        envMapIntensity={3.0}
+        color="#f0f5ff"
       />
     </RoundedBox>
   );
