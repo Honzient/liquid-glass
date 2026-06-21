@@ -1,20 +1,19 @@
 import { useRef, useMemo } from "react";
-import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { shaderMaterial } from "@react-three/drei";
 import { extend } from "@react-three/fiber";
 import GLASS_VERT from "../shaders/glass.vert?raw";
 import GLASS_FRAG from "../shaders/glass.frag?raw";
 
-/* ── Custom shader material (drei utility) ── */
+/* ── Custom shader material ── */
 const GlassShaderMaterial = shaderMaterial(
   {
     u_content: null as THREE.Texture | null,
     u_contentResolution: new THREE.Vector2(1, 1),
     u_glassSize: new THREE.Vector2(1, 1),
-    u_glassRadius: 0.15,
+    u_glassRadius: 0.12,
     u_refractionAmount: 0.025,
-    u_chromaticAberration: 0.06,
+    u_chromaticAberration: 0.05,
     u_time: 0,
   },
   GLASS_VERT,
@@ -23,7 +22,6 @@ const GlassShaderMaterial = shaderMaterial(
 
 extend({ GlassShaderMaterial });
 
-/* ── JSX type declaration ── */
 declare global {
   namespace JSX {
     interface IntrinsicElements {
@@ -32,7 +30,8 @@ declare global {
   }
 }
 
-interface GlassSurfaceProps {
+/* ── Props ── */
+export interface GlassSurfaceProps {
   contentTexture: THREE.Texture;
   glassWidth: number;
   glassHeight: number;
@@ -42,25 +41,29 @@ interface GlassSurfaceProps {
 }
 
 /**
- * Full-screen glass plane that applies:
- *   - SDF rounded-rect mask (discard outside → Electron transparency)
- *   - Fresnel edge reflections
- *   - 7-layer chromatic dispersion
- *   - Bevel specular highlights
+ * Full-screen glass plane.
  *
- * Samples the FBO texture (u_content) which contains the fluid waves + lyrics.
+ * Shader layers (inspired by Kyant0/AndroidLiquidGlass):
+ *   1. SDF rounded rect → glass boundary
+ *   2. Three-region masking → body / inner-edge / outer-rim
+ *   3. Content magnification → subtle lens effect
+ *   4. 7-layer chromatic dispersion → rainbow edge fringing
+ *   5. 5×5 Gaussian blur → frosted glass body
+ *   6. Schlick Fresnel → edge reflections
+ *   7. Directional lighting → top glow + bottom shade
+ *   8. Procedural environment reflection → sky/ground
+ *   9. Glass rim darkness → thickness illusion
+ *   10. discard outside → Electron desktop transparency
  */
 export default function GlassSurface({
   contentTexture,
   glassWidth,
   glassHeight,
-  glassRadius = 0.15,
+  glassRadius = 0.12,
   refractionAmount = 0.025,
-  chromaticAberration = 0.06,
+  chromaticAberration = 0.05,
 }: GlassSurfaceProps) {
-  const materialRef = useRef<THREE.ShaderMaterial & {
-    uniforms: Record<string, any>;
-  }>(null);
+  const materialRef = useRef<any>(null);
 
   const resolutionVec = useMemo(
     () => new THREE.Vector2(glassWidth, glassHeight),
@@ -71,13 +74,6 @@ export default function GlassSurface({
     () => new THREE.Vector2(glassWidth, glassHeight),
     [glassWidth, glassHeight],
   );
-
-  // Update chromaticAberration uniform when prop changes
-  useFrame(() => {
-    if (materialRef.current) {
-      materialRef.current.uniforms.u_chromaticAberration.value = chromaticAberration;
-    }
-  });
 
   return (
     <mesh>
