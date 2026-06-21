@@ -1,31 +1,89 @@
-# CONTEXT — Liquid Glass (3D Fish Tank)
+# CONTEXT — Liquid Glass Lyrics (Spotify Desktop App)
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│              Electron Transparent Window             │
+│  ┌───────────────────────────────────────────────┐   │
+│  │         HTML Overlay (ControlPanel)            │   │
+│  ├───────────────────────────────────────────────┤   │
+│  │           R3F Canvas (alpha:true)              │   │
+│  │  ┌─────────────────────────────────────────┐   │   │
+│  │  │        GlassSurface (full-screen quad)   │   │   │
+│  │  │  SDF rounded rect + Fresnel + 7-layer   │   │   │
+│  │  │  chromatic dispersion + bevel highlights│   │   │
+│  │  │  discard outside → desktop shows through │   │   │
+│  │  └──────────────┬──────────────────────────┘   │   │
+│  │                 │ u_content (sampler2D)          │   │
+│  │  ┌──────────────▼──────────────────────────┐   │   │
+│  │  │         FBO (2048×2048)                   │   │   │
+│  │  │  ┌────────────────────────────────────┐  │   │   │
+│  │  │  │ FluidBody (Gerstner wave plane)    │  │   │   │
+│  │  │  │ - 5-wave Gerstner summation        │  │   │   │
+│  │  │  │ - Depth-based water color gradient │  │   │   │
+│  │  │  │ - Crest specular + caustic sim     │  │   │   │
+│  │  │  │ - Audio-reactive (bass/energy/trbl)│  │   │   │
+│  │  │  ├────────────────────────────────────┤  │   │   │
+│  │  │  │ LyricsText (CanvasTexture plane)   │  │   │   │
+│  │  │  │ - Glass-etch emboss rendering      │  │   │   │
+│  │  │  │ - Typewriter character reveal      │  │   │   │
+│  │  │  │ - Centered above wave surface      │  │   │   │
+│  │  │  └────────────────────────────────────┘  │   │   │
+│  │  └─────────────────────────────────────────┘   │   │
+│  └───────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────┘
+```
 
 ## Glossary
 
-- **Tank (水缸)** — 整个 3D 渲染区域的统称，由外层玻璃 Box 和内层水体 Box 组成。响应式撑满 Electron 无边框窗口。
-- **Outer Box (外层玻璃)** — 使用 `MeshTransmissionMaterial` 渲染的高折射率厚玻璃外壳。无边框窗口本身即为此玻璃。
-- **Inner Box (水体)** — 嵌套在外层 Box 内部的半满水体体积。底部和四壁固定，仅顶部顶点参与波浪位移。
-- **Fluid Volume (水体体积)** — 半缸水的 3D 体积。不是薄片，具有真实的 Y 轴厚度。
-- **Half-Tank Threshold (半缸阈值)** — 水体 Box 内部区分"水面以上"和"水面以下"的 Y 轴分界线。
-- **Responsive Viewport (响应式视口)** — 水缸宽高比随窗口自由缩放，无黑边，始终撑满。
-- **Transparent Desktop Background** — Electron `transparent: true`，水缸背后直接透出系统桌面壁纸和图标，不做任何 2D 模糊处理。
-- **Perspective Camera (透视相机)** — FOV 10-15°，Z 轴拉远以逼近正侧面平视，同时保留 PBR 光学折射计算。
-- **Silk Waves (丝绸波浪)** — 由 3-4 个不同频率平滑正弦波叠加而成的水面动画，无噪声，无锯齿。
-- **Refracted Lyrics (悬浮折射歌词)** — 放置在水体内部的 3D 文本，隔着厚玻璃和起伏水面产生光学扭曲。
-- **u_bass** — 控制波浪高度的 uniform，由音频低频能量驱动或手动滑块调节。
-- **u_energy** — 控制波浪频率/剧烈程度的 uniform。
-- **Glass Wall Thickness (缸壁厚度)** — 0.2-0.5 世界单位。Z 轴深度固定为 3-4 单位，thickness 仅指缸壁的物理厚度。
-- **Inner Box Clearance (嵌套间隙)** — 水体 Box 的 X/Z 尺寸 = 外层 Box 减去 2×缸壁厚度，防止 Z-fighting 并保持正确折射路径。
-- **Fluid Box Height Ratio (水体高度比)** — 水体 Box 的 Y 轴高度 = 外层 Box 高度的 60%，放置于底部。顶部顶点 Y = fluidBoxHeight/2。
-- **Vertex Displacement Gate (顶点位移门控)** — Shader 中 `position.y >= (fluidBoxHeight/2.0 - 0.01)` 判断，仅顶部顶点参与正弦波位移，其余保持静止。
-- **Material Split (材质分层策略)** — 外层 = MeshTransmissionMaterial (IOR 1.5, chromaticAberration)，内层 = CustomShaderMaterial 扩展自 MeshPhysicalMaterial (transparent, opacity 0.7-0.85, 深靛蓝)。
-- **Optical Deception (光学欺骗)** — 利用外层玻璃的折射包裹内层半透明水体，制造"水体在玻璃内折射"的视觉错觉，避免双层 Transmission 的性能灾难。
-- **Wave Triad (三波叠加)** — 纯正弦波沿 X 轴传播 `sin(x·freq + time·speed)`。主波 0.5Hz（大振幅）、次波 1.2Hz（中振幅+相位差）、细节波 2.5Hz（极小振幅）。严禁 fract/noise。
-- **Demo Sliders (演示滑块)** — 当前唯一数据源。三个 HTML range input（Bass, Energy, Treble）→ React State → Shader Uniforms。后续替换数据源时 Shader 无需改动。
-- **Idle Breeze (静音微风)** — u_bass=0 时水面不完全静止，基础振幅 = 最大浪高 5-10%，基础速度 0.1x。u_bass 是振幅乘数，u_energy 是速度乘数。
-- **Lyric Placement (歌词定位)** — Inter 无衬线字体，纯白 emissive，悬浮于水体 Box 几何中心偏后 (Z ≈ 0 ~ -0.5)，字号约水缸高度的 1/5。直接替换，无切换动画。
-- **Rounded Glass Edge (玻璃倒角)** — 外层 Box 使用 Drei `<RoundedBox>` 替代普通 BoxGeometry，圆角半径 0.05，增强边缘高光折射。
-- **Lighting Triad (三灯布局)** — Environment "city" + DirectionalLight [5,5,5]（锐利高光）+ 水体内部 AmbientLight/PointLight（防歌词死黑）。
-- **UI Overlay (HTML 叠加层)** — 纯 HTML/CSS absolute 定位 + z-index，不嵌入 3D 场景。三个滑块 Bass/Energy/Treble 范围 [0, 2.0] 步长 0.01。
-- **Platform Target** — Windows only，60fps 锁定，Electron ≥28，npm，TypeScript。
-- **u_treble (双重映射)** — (1) 物理层：作为细节波 (2.5Hz+) 振幅乘数；(2) 光学层：动态驱动外层 `chromaticAberration`（基础 0.04，峰值 0.15-0.2），制造高音 RGB 色边闪烁。
+### Visual Layer
+
+- **LiquidTank (液态缸)** — Root orchestrator component. Owns FBO, audio data flow, and renders GlassSurface with the FBO texture.
+- **GlassSurface (玻璃表面)** — Full-screen plane with custom shaderMaterial. Applies SDF rounded-rect mask, Fresnel edge reflections, 7-layer chromatic dispersion, and bevel specular highlights. Discards fragments outside the SDF boundary for true Electron transparency.
+- **FluidBody (流体体积)** — FBO content shader rendering procedural water. Uses 5-wave Gerstner summation for realistic fluid dynamics. Renders depth-graded water coloring, crest specular highlights, and caustic-like light interference.
+- **LyricsText (歌词文字)** — CanvasTexture-based text plane rendered inside the FBO scene. Uses emboss/deboss effect for "glass-burned" typography. Controlled by a typewriter animation hook.
+- **FBO (帧缓冲)** — 2048×2048 off-screen render target. Contains the FluidBody wave scene and LyricsText. Sampled by GlassSurface as `u_content`.
+- **ControlPanel (控制面板)** — HTML/CSS overlay positioned above the WebGL canvas via z-index. Contains Bass/Energy/Treble sliders and audio source selector.
+
+### Wave Dynamics
+
+- **Gerstner Wave (Gerstner 波浪)** — Physically-based ocean wave model. Each wave component contributes horizontal displacement (steepness) plus vertical displacement (height). `x += Q*A*cos(freq*dot(dir,pos) + time*speed)`, `y += A*sin(...)`. More realistic than pure sine — produces sharper crests and flatter troughs.
+- **Wave Quintet (五波叠加)** — Five Gerstner components: primary swell (bass-driven), secondary roll, cross swell, detail ripple (treble-driven), micro detail. Each has distinct direction, frequency, amplitude, steepness, and phase.
+- **Idle Breeze (静音微风)** — Minimum 10-15% amplitude even with zero audio input. Prevents dead-flat water surface. All wave speeds have a base multiplier of 0.3× when audio is silent.
+- **Crest Specular (波峰高光)** — Exponential falloff `exp(-dist * k)` at wave crests. Two layers: broad crest glow (k=80) and sharp specular line (k=200). Intensity modulated by u_volume.
+- **Caustic Simulation (焦散模拟)** — Interference pattern from crossed sinusoids `sin(x·f1) * cos(y·f2)` modulated in time. Subtle (8% blend) only in shallow water region.
+
+### Optical Layer
+
+- **SDF Rounded Rect (符号距离函数圆角矩形)** — Defines the glass boundary. `sd = length(max(abs(p)-halfSize+radius,0)) + min(max(px,py),0) - radius`. sd > 0 → outside glass → discard.
+- **Fresnel Reflectance (菲涅尔反射)** — Schlick approximation: `R(θ) = R₀ + (1-R₀)(1-cosθ)⁵` where R₀ = ((1-IOR)/(1+IOR))² and IOR = 1.5. Increases reflectivity at grazing angles (near glass edges).
+- **Chromatic Dispersion 7-Layer (七层色散)** — Wavelength-dependent texture sampling offsets: Red (offset×1.00), Orange (0.83), Yellow (0.67), Green (0, center), Cyan (-0.17), Blue (-0.33), Violet (-0.50). Each layer weighted by its spectral contribution. Final result blended with center sample to prevent oversaturation.
+- **Bevel Highlight (倒角高光)** — `dot(normal, lightDir) * 0.5 + 0.5` masked by edge proximity. Simulates light catching the beveled glass edge.
+- **u_treble Dual Mapping (u_treble 双重映射)** — (1) Physical: drives detail wave amplitude in FluidBody; (2) Optical: modulates `u_chromaticAberration` in GlassSurface (base 0.04, peak 0.18). Creates high-frequency color fringing that dances with the music.
+
+### Audio Pipeline
+
+- **AudioEngine (音频引擎)** — Singleton class managing Web Audio API context, AnalyserNode (FFT size 2048), and audio source. Supports three modes: demo (simulated rhythms), microphone, system audio loopback. Extracts frequency bands: bass (20-250Hz), energy (250-2000Hz), treble (2000-20000Hz).
+- **Demo Mode (演示模式)** — Simulated audio using OscillatorNode + LFO. Bass: 55Hz sine with rhythmic gain envelope (simulated kick). Mid: 440Hz triangle with slow sweep. High: white noise with periodic bursts. No real audio source required — waves dance automatically.
+- **Frequency Bands (频段)** — bass = RMS of FFT bins 0-25 (20-250Hz). energy = RMS of bins 26-200 (250-2000Hz). treble = RMS of bins 201-1024 (2000-20000Hz). All values smoothed with exponential moving average (α=0.15).
+- **Beat Detection (节拍检测)** — Bass energy exceeds 1.4× the trailing average → beat trigger. Cooldown of 200ms prevents double-triggers.
+
+### Lyrics System
+
+- **Typewriter Effect (打字机效果)** — Characters revealed one at a time at configurable speed (default 80ms/char). Uses useTypewriter hook with requestAnimationFrame-driven timer.
+- **Glass-Etch Text (玻璃烧制文字)** — Canvas 2D rendering technique: shadow offset (+2,+2) for depth, highlight offset (-1,-1) for raised edge, main text in semi-transparent white, outer glow with blue tint. Creates appearance of text embossed into glass.
+- **Text Placement (文字定位)** — Plane centered at origin in FBO space, Y offset +0.15 above wave midline. Width ≈ 0.7, height ≈ 0.14 (proportional to viewport). Rendered with transparent background so fluid waves show through.
+
+### Platform
+
+- **Electron Window (电子窗口)** — Frameless, transparent, 1024×600 default, resizable. `transparent: true`, `frame: false`, `hasShadow: false`. macOS: compatible but untested.
+- **R3F Canvas (React Three Fiber 画布)** — `alpha: true`, `premultipliedAlpha: true`. Camera: perspective FOV 12° at [0,0,20] for near-orthographic side view.
+- **Shader Pipeline (着色器管线)** — Custom shaderMaterial (drei utility) for both GlassSurface and FluidBody. No CSM dependency in critical path (kept as optional enhancement). Uniforms flow: AudioEngine → React state → useFrame → shaderMaterial.uniforms.
+- **Target Platform** — Windows 11, Electron 33, Vite 6, React 18, Three.js 0.170, R3F 8.17, Drei 9.117. 60fps target.
+
+### Future Integration
+
+- **Spotify Web Playback SDK** — Will provide real audio source replacing demo oscillators. Connect to AudioEngine via MediaElementAudioSourceNode.
+- **Spotify Lyrics API** — Will supply timed lyrics text for typewriter display. Current state uses placeholder text.
+- **System Audio Loopback** — WASAPI loopback capture via `navigator.mediaDevices.getUserMedia({ audio: { mandatory: { chromeMediaSource: 'desktop' } } })`. Requires Electron `desktopCapturer` integration.
