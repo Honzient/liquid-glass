@@ -13,33 +13,22 @@ function Scene() {
 
   return (
     <>
-      {/* Perspective camera: FOV 12°, far on Z for near-orthographic side-view */}
-      <perspectiveCamera
-        position={[0, 0, 20]}
-        fov={12}
-        near={0.1}
-        far={100}
-      />
-
-      {/* City HDR for reflections only (not scene background — desktop shows through) */}
+      {/* City HDR for reflections only (not scene background) */}
       <Environment preset="city" background={false} />
 
       {/* Sharp edge highlight on the glass */}
       <directionalLight position={[5, 5, 5]} intensity={1.5} />
 
-      {/* Static glass outer box */}
+      {/* Semi-transparent glass outer box */}
       <OuterBox
         width={tankWidth}
         height={tankHeight}
         depth={TANK_DEPTH}
-        chromaticAberration={0.04}
       />
     </>
   );
 }
 
 export default function Tank() {
-  return (
-    <Scene />
-  );
+  return <Scene />;
 }

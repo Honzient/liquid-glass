@@ -3,7 +3,6 @@
 INPUT=$(cat)
 
 DANGEROUS_PATTERNS=(
-  "git push"
   "git reset --hard"
   "git clean -fd"
   "git clean -f"

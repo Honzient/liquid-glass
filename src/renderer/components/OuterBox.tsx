@@ -1,32 +1,22 @@
-import { RoundedBox, MeshTransmissionMaterial } from "@react-three/drei";
+import { RoundedBox } from "@react-three/drei";
 
 interface OuterBoxProps {
   width: number;
   height: number;
   depth: number;
-  chromaticAberration: number;
 }
 
-export default function OuterBox({
-  width,
-  height,
-  depth,
-  chromaticAberration,
-}: OuterBoxProps) {
+export default function OuterBox({ width, height, depth }: OuterBoxProps) {
   return (
-    <RoundedBox
-      args={[width, height, depth]}
-      radius={0.05}
-      bevelSegments={4}
-    >
-      <MeshTransmissionMaterial
-        transmission={1}
-        ior={1.5}
-        thickness={0.3}
-        roughness={0}
-        chromaticAberration={chromaticAberration}
-        samples={8}
-        resolution={1024}
+    <RoundedBox args={[width, height, depth]} radius={0.05} bevelSegments={4}>
+      <meshPhysicalMaterial
+        transparent={true}
+        opacity={0.15}
+        roughness={0.05}
+        metalness={0.2}
+        clearcoat={1}
+        clearcoatRoughness={0.1}
+        envMapIntensity={2.5}
       />
     </RoundedBox>
   );
